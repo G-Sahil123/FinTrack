@@ -1,6 +1,6 @@
 # 💸 Expense Tracker
 
-A minimal full-stack personal finance tool built with **FastAPI + MySQL** (backend) and **Streamlit** (frontend).
+A minimal full-stack personal finance tool built with **FastAPI + PostgreSQL** (backend) and **Streamlit** (frontend).
 
 ---
 
@@ -20,21 +20,17 @@ A minimal full-stack personal finance tool built with **FastAPI + MySQL** (backe
 ## Project Structure
 
 ```
-expense-tracker/
+FINTRACK/
 ├── backend/
-│   ├── main.py          # FastAPI routes
-│   ├── database.py      # SQLAlchemy engine & session
-│   ├── models.py        # ORM model (Expense)
-│   ├── schemas.py       # Pydantic request/response schemas
-│   ├── crud.py          # DB operations
+│   ├── main.py          
+│   ├── database.py     
+│   ├── models.py        
+│   ├── schemas.py       
+│   ├── crud.py          
 │   ├── requirements.txt
-│   └── .env.example     # Copy to .env and fill in DATABASE_URL
 ├── frontend/
-│   ├── app.py           # Streamlit UI
+│   ├── app.py           
 │   ├── requirements.txt
-│   └── .streamlit/
-│       └── secrets.toml.example
-├── render.yaml          # Render deployment config
 └── README.md
 ```
 
@@ -46,8 +42,6 @@ expense-tracker/
 
 ```bash
 cd backend
-cp .env.example .env
-# Edit .env and set your DATABASE_URL
 
 pip install -r requirements.txt
 uvicorn main:app --reload
