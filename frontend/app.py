@@ -136,8 +136,13 @@ with st.expander("➕ Add New Expense", expanded=True):
             max_value=date.today(),
         )
 
-        submitted = st.form_submit_button("Save Expense", type="primary", 
-                use_container_width=True,disabled=st.session_state.submitting)
+        # Disable button if submitting
+        submitted = st.form_submit_button(
+            "Save Expense",
+            type="primary",
+            use_container_width=True,
+            disabled=st.session_state.submitting
+        )
 
         if submitted:
             # -- Client-side validation --
@@ -166,10 +171,11 @@ with st.expander("➕ Add New Expense", expanded=True):
                         "description": description.strip() or None,
                         "date": str(expense_date),
                     }
+
                     if st.session_state.pending_request is None:
                         st.session_state.pending_request = payload  # persist payload across refresh
 
-                        # Add to pending expenses 
+                        # Add to pending expenses (optimistic UI)
                         st.session_state.pending_expenses.append({
                             "id": str(uuid.uuid4()),
                             "idempotency_key": st.session_state.idempotency_key,
@@ -189,24 +195,30 @@ with st.expander("➕ Add New Expense", expanded=True):
                                 st.session_state.pending_expenses.pop(i)
                                 break
 
-                        st.session_state.pending_request = None  # clear pending request
+                        # Clear pending_request
+                        st.session_state.pending_request = None
+
+                        # Save result for display
+                        st.session_state.submit_result = (success, message)
                         if success:
-                            st.session_state.submit_result = (success, message)
-                            st.session_state.idempotency_key = str(uuid.uuid4())  # rotate for next expense
-                            st.rerun()
-                        else:
-                            st.session_state.submit_result = (success, message)
+                            st.session_state.idempotency_key = str(uuid.uuid4())  # rotate key
+
             finally:
+                # Don't disable the button after submission
                 st.session_state.submitting = False
 
-    # Shows result outside the form so it persists after rerun
+    # Show result outside the form so it persists after submission
     if st.session_state.submit_result is not None:
         ok, msg = st.session_state.submit_result
         if ok:
             st.success(msg)
         else:
             st.error(msg)
+
+        # Reset form state so button is enabled
+        st.session_state.submitting = False
         st.session_state.submit_result = None
+
 
 st.divider()
 
