@@ -1,0 +1,7 @@
+fastapi
+uvicorn[standard]
+pydantic 
+cryptography
+sqlalchemy
+pymysql
+python-dotenv
