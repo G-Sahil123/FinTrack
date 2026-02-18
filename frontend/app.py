@@ -93,6 +93,9 @@ if "submit_result" not in st.session_state:
 if "submitting" not in st.session_state:
     st.session_state.submitting = False
 
+if "pending_expenses" not in st.session_state:
+    st.session_state.pending_expenses = []  # List of dicts
+
 # ── Page ───────────────────────────────────────────────────────────────────────
 st.title("💸 Expense Tracker")
 st.caption("Track your personal expenses. All amounts in ₹.")
@@ -161,14 +164,27 @@ with st.expander("➕ Add New Expense", expanded=True):
                         "description": description.strip() or None,
                         "date": str(expense_date),
                     }
+                    st.session_state.pending_expenses.append({
+                        "id": str(uuid.uuid4()),
+                        "idempotency_key": st.session_state.idempotency_key,
+                        "amount": str(amount_val),
+                        "category": category.strip(),
+                        "description": description.strip() or None,
+                        "date": str(expense_date),
+                        "status": "Pending...",
+                    })                    
 
                     with st.spinner("Saving..."):
                         success, message, _ = post_expense_with_retry(payload)
 
-                    st.session_state.submit_result = (success, message)
+                    for i, exp in enumerate(st.session_state.pending_expenses):
+                        if exp["idempotency_key"] == st.session_state.idempotency_key:
+                            st.session_state.pending_expenses.pop(i)
+                            break
 
                     if success:
                         # Rotate key so next submission is a fresh expense
+                        st.session_state.submit_result = (success, message)
                         st.session_state.idempotency_key = str(uuid.uuid4())
                         st.rerun()
             finally:
@@ -239,6 +255,19 @@ elif data:
                 st.table(summary_data)
 
         # ── Expenses table ──
+        # ── Pending expenses (optimistic UI) ──
+        for exp in st.session_state.pending_expenses:
+            with st.container(border=True):
+                c1, c2, c3 = st.columns([2, 1, 1])
+                with c1:
+                    st.markdown(f"**{exp['category']}**")
+                    if exp.get("description"):
+                        st.caption(exp["description"])
+                with c2:
+                    st.markdown(f"**{format_inr(exp['amount'])}**")
+                with c3:
+                    st.caption(f"⏳ {exp['status']}")
+
         for exp in expenses:
             with st.container(border=True):
                 c1, c2, c3 = st.columns([2, 1, 1])
