@@ -7,7 +7,7 @@ import os
 import time
 
 #  Config 
-API_BASE = os.getenv("API_BASE_URL", "http://localhost:8000")
+API_BASE = "https://fintrack-2-uu49.onrender.com"
 
 st.set_page_config(
     page_title="Expense Tracker",
