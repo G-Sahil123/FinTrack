@@ -11,8 +11,8 @@ DATABASE_URL = os.getenv("DATABASE_URL")
 assert DATABASE_URL is not None
 engine = create_engine(
     DATABASE_URL,
-    pool_pre_ping=True,       # Handles stale connections gracefully
-    pool_recycle=300,          # Recycle connections every 5 mins
+    pool_pre_ping=True,       
+    pool_recycle=300,          
     echo=False,
 )
 

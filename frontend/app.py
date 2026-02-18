@@ -6,7 +6,7 @@ from decimal import Decimal, InvalidOperation
 import os
 import time
 
-# ── Config ────────────────────────────────────────────────────────────────────
+#  Config 
 API_BASE = os.getenv("API_BASE_URL", "http://localhost:8000")
 
 st.set_page_config(
@@ -15,7 +15,7 @@ st.set_page_config(
     layout="centered",
 )
 
-# ── Helpers ───────────────────────────────────────────────────────────────────
+#  Helpers 
 
 def post_expense(payload: dict) -> tuple[bool, str, dict | None]:
     """POST /expenses. Returns (success, message, data)."""
@@ -35,7 +35,7 @@ def post_expense(payload: dict) -> tuple[bool, str, dict | None]:
 
 MAX_RETRIES = 3
 
-def post_expense_with_retry(payload: dict) -> tuple[bool, str, dict | None]:
+def post_expense_with_retry(payload: dict) -> tuple[bool, str, dict | None]: #type:ignore
     """
     Calls `post_expense` with retries and exponential backoff.
     """
@@ -83,26 +83,28 @@ def format_inr(amount) -> str:
         return f"₹{amount}"
 
 
-# ── Session state init ─────────────────────────────────────────────────────────
+#  Session state init 
 if "idempotency_key" not in st.session_state:
     st.session_state.idempotency_key = str(uuid.uuid4())
 
 if "submit_result" not in st.session_state:
-    st.session_state.submit_result = None # (success: bool, message: str)
+    st.session_state.submit_result = None 
 
 if "submitting" not in st.session_state:
     st.session_state.submitting = False
 
 if "pending_expenses" not in st.session_state:
-    st.session_state.pending_expenses = []  # List of dicts
+    st.session_state.pending_expenses = []  
 
-# ── Page ───────────────────────────────────────────────────────────────────────
+if "pending_request" not in st.session_state:
+    st.session_state.pending_request = None
+
 st.title("💸 Expense Tracker")
 st.caption("Track your personal expenses. All amounts in ₹.")
 
 st.divider()
 
-# ── Section 1: Add Expense ─────────────────────────────────────────────────────
+#  Section 1: Add Expense 
 with st.expander("➕ Add New Expense", expanded=True):
     with st.form("add_expense_form", clear_on_submit=False):
         col1, col2 = st.columns(2)
@@ -138,7 +140,7 @@ with st.expander("➕ Add New Expense", expanded=True):
                 use_container_width=True,disabled=st.session_state.submitting)
 
         if submitted:
-            # ── Client-side validation ──
+            # -- Client-side validation --
             st.session_state.submitting = True
             try:
                 errors = []
@@ -164,33 +166,40 @@ with st.expander("➕ Add New Expense", expanded=True):
                         "description": description.strip() or None,
                         "date": str(expense_date),
                     }
-                    st.session_state.pending_expenses.append({
-                        "id": str(uuid.uuid4()),
-                        "idempotency_key": st.session_state.idempotency_key,
-                        "amount": str(amount_val),
-                        "category": category.strip(),
-                        "description": description.strip() or None,
-                        "date": str(expense_date),
-                        "status": "Pending...",
-                    })                    
+                    if st.session_state.pending_request is None:
+                        st.session_state.pending_request = payload  # persist payload across refresh
 
-                    with st.spinner("Saving..."):
-                        success, message, _ = post_expense_with_retry(payload)
+                        # Add to pending expenses 
+                        st.session_state.pending_expenses.append({
+                            "id": str(uuid.uuid4()),
+                            "idempotency_key": st.session_state.idempotency_key,
+                            "amount": str(amount_val),
+                            "category": category.strip(),
+                            "description": description.strip() or None,
+                            "date": str(expense_date),
+                            "status": "Pending...",
+                        })                  
 
-                    for i, exp in enumerate(st.session_state.pending_expenses):
-                        if exp["idempotency_key"] == st.session_state.idempotency_key:
-                            st.session_state.pending_expenses.pop(i)
-                            break
+                        with st.spinner("Saving..."):
+                            success, message, _ = post_expense_with_retry(st.session_state.pending_request)
 
-                    if success:
-                        # Rotate key so next submission is a fresh expense
-                        st.session_state.submit_result = (success, message)
-                        st.session_state.idempotency_key = str(uuid.uuid4())
-                        st.rerun()
+                        # Remove from pending_expenses after response
+                        for i, exp in enumerate(st.session_state.pending_expenses):
+                            if exp["idempotency_key"] == st.session_state.idempotency_key:
+                                st.session_state.pending_expenses.pop(i)
+                                break
+
+                        st.session_state.pending_request = None  # clear pending request
+                        if success:
+                            st.session_state.submit_result = (success, message)
+                            st.session_state.idempotency_key = str(uuid.uuid4())  # rotate for next expense
+                            st.rerun()
+                        else:
+                            st.session_state.submit_result = (success, message)
             finally:
                 st.session_state.submitting = False
 
-    # Show result outside the form so it persists after rerun
+    # Shows result outside the form so it persists after rerun
     if st.session_state.submit_result is not None:
         ok, msg = st.session_state.submit_result
         if ok:
@@ -201,7 +210,7 @@ with st.expander("➕ Add New Expense", expanded=True):
 
 st.divider()
 
-# ── Section 2: Filters ─────────────────────────────────────────────────────────
+#  Section 2: Filters 
 st.subheader("📋 My Expenses")
 
 col_f1, col_f2 = st.columns([2, 1])
@@ -215,7 +224,7 @@ with col_f2:
 
 sort_desc = sort_order == "Newest First"
 
-# ── Section 3: Expense List ────────────────────────────────────────────────────
+#  Section 3: Expense List 
 with st.spinner("Loading expenses..."):
     ok, err_msg, data = fetch_expenses(
         category=selected_category,
@@ -232,7 +241,7 @@ elif data:
     if count == 0:
         st.info("No expenses found for the selected filter.")
     else:
-        # ── Total banner ──
+        # -- Total banner --
         st.metric(
             label=f"Total ({count} expense{'s' if count != 1 else ''})",
             value=format_inr(total),
@@ -240,7 +249,7 @@ elif data:
 
         st.markdown("")
 
-        # ── Per-category summary ──
+        # -- Per-category summary --
         if selected_category == "All" and count > 0:
             with st.expander("📊 Summary by Category"):
                 cat_totals: dict[str, Decimal] = {}
@@ -254,8 +263,8 @@ elif data:
                 ]
                 st.table(summary_data)
 
-        # ── Expenses table ──
-        # ── Pending expenses (optimistic UI) ──
+        # -- Expenses table --
+        # -- Pending expenses --
         for exp in st.session_state.pending_expenses:
             with st.container(border=True):
                 c1, c2, c3 = st.columns([2, 1, 1])
@@ -268,7 +277,11 @@ elif data:
                 with c3:
                     st.caption(f"⏳ {exp['status']}")
 
-        for exp in expenses:
+        # --Limit on shown results--
+        MAX_VISIBLE = 20
+        for exp in expenses[:MAX_VISIBLE]:
+            if len(expenses) > MAX_VISIBLE:
+                st.info(f"Showing first {MAX_VISIBLE} of {len(expenses)} expenses. Refine filters to see more.")
             with st.container(border=True):
                 c1, c2, c3 = st.columns([2, 1, 1])
                 with c1:

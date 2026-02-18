@@ -4,21 +4,40 @@ from models import Expense
 from schemas import ExpenseCreate
 from typing import Optional
 import uuid
+from sqlalchemy.exc import IntegrityError, OperationalError, DatabaseError
+import time
 
+MAX_DB_RETRIES = 3
+
+def save_expense_with_retry(db, expense):
+    """Retry saving expense for transient DB errors."""
+    for attempt in range(MAX_DB_RETRIES):
+        try:
+            db.add(expense)
+            db.commit()
+            db.refresh(expense)
+            return expense
+        except (OperationalError, DatabaseError) as e:
+            db.rollback()
+            if attempt < MAX_DB_RETRIES - 1:
+                # Exponential backoff: 1, 2, 4 seconds
+                time.sleep(2 ** attempt)
+            else:
+                # Give up after last attempt
+                raise e
 
 def create_expense(db: Session, expense_in: ExpenseCreate) -> tuple[Expense, bool]:
     """
     Create a new expense. If idempotency_key already exists, return the existing
     record without creating a duplicate. Returns (expense, was_created).
     """
-    # Check for existing record with this idempotency key
     existing = (
         db.query(Expense)
         .filter(Expense.idempotency_key == expense_in.idempotency_key)
         .first()
     )
     if existing:
-        return existing, False  # Idempotent: return existing, signal not newly created
+        return existing, False  
 
     new_expense = Expense(
         id=str(uuid.uuid4()),
@@ -30,12 +49,9 @@ def create_expense(db: Session, expense_in: ExpenseCreate) -> tuple[Expense, boo
     )
 
     try:
-        db.add(new_expense)
-        db.commit()
-        db.refresh(new_expense)
-        return new_expense, True
+        saved_expense = save_expense_with_retry(db,new_expense)
+        return saved_expense, True
     except IntegrityError:
-        # Race condition: another request with same key committed first
         db.rollback()
         existing = (
             db.query(Expense)

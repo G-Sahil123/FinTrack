@@ -9,7 +9,6 @@ import crud
 import schemas
 from database import engine, get_db
 
-# Create all tables on startup if they don't exist
 models.Base.metadata.create_all(bind=engine)
 
 app = FastAPI(
@@ -18,10 +17,9 @@ app = FastAPI(
     version="1.0.0",
 )
 
-# CORS — allow Streamlit Cloud and local dev to reach this API
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],   # Tighten this in production if needed
+    allow_origins=["*"],   
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
